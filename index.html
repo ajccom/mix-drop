@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>混合水滴</title>
+  <meta name="viewport" content="user-scalable=no, width=device-width, minimum-scale=1, initial-scale=1, maximum-scale=1" />
+  <meta name="apple-mobile-web-app-title" content="mix drop" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="format-detection" content="telephone=no" />
+  <style>
+  * {margin: 0; padding: 0}
+  </style>
+  <script src="jquery-1.10.2.min.js"></script>
+</head>
+<body>
+<canvas width="300" height="500" id="canvas">change your browser~</canvas>
+<style>
+canvas {width: 300px; height: 500px; margin: 0 auto; display: block;}
+.help-show-box {position: absolute; left: 0; bottom: 0; width: 100%; height: 50px; border: 1px solid #bbb; background: #000; color: #fff; font-size: 14px; line-height: 1.4em; overflow: hidden;}
+.help-show-box p {padding: 3px;}
+</style>
+<script>
+"use strict"
+;(function (isDebug) {
+  var canvas      = document.getElementById('canvas'),
+      ctx         = canvas.getContext('2d'),
+      core1       = {xy: [150, 120], r: 50},
+      core2       = {xy: [150, 120], r: 30},
+      flex        = 0.8, //[0 - 1], 柔韧度，描述在两核之间表面弧度的切面角度位置
+      deltaD1     = 0,
+      deltaD2     = 0,
+      density     = 0.4, //(0 - oo), 表面圆半径的宽度，数值为超出大核半径的倍数
+      ductility   = 3, //(0, oo), 延展性，数值为两核半径之和的倍数，可求出最大拉伸距离
+      current     = 25 //拉伸的长度，单位为px
+  
+  //defined constant be used in function
+  var max = (core1.r + core2.r) * ductility,
+      speed = max / 200,
+      r1 = core1.r * (1 + density),
+      r2 = core2.r * (1 + density),
+      deltaR = r1 - r2,
+      sumR = r1 + r2,
+      r1r1 = r1 * r1,
+      r2r2 = r2 * r2,
+      rr1 = core1.r * core1.r,
+      rr2 = core2.r * core2.r,
+      deltaRr = rr1 - rr2,
+      pi = Math.PI
+  
+  function run () {
+    requestAFrame(function () {
+      if (ftpHandler.check()) {
+        release()
+        draw()
+      }
+      run()
+    })
+  }
+  
+  function getPoints (deltaHeight) {
+    var p1 = [],
+        p2 = [],
+        p3 = [],
+        p4 = [],
+        x = core1.xy[0],
+        h1 = core1.xy[1],
+        h2 = 0,
+        w1 = r1,
+        w2 = 0,
+    deltaHeight = deltaHeight <= max ? (deltaHeight > 0 ? deltaHeight : 0) : max
+    if (deltaHeight <= deltaR) {
+      h2 = h1
+      w2 = w1
+    } else {
+      //求core1 core2的外切圆
+      var r = deltaHeight * (1 + flex),
+          deg1 = deltaHeight,
+          deg2 = r + r1,
+          deg3 = r + r2,
+          deltaD1 = pi / 2 - Math.acos((deg1 * deg1 + deg2 * deg2 - deg3 * deg3) / (2 * deg1 * deg2)),
+          deltaD2 = pi / 2 - Math.acos((deg1 * deg1 + deg3 * deg3 - deg2 * deg2) / (2 * deg1 * deg3)),
+          cx = x - deg2 * Math.cos(deltaD1),
+          cy = h1 + deg2 * Math.sin(deltaD1),
+          cx2 = x + deg2 * Math.cos(deltaD1)
+      h1 = h1 + r1 * Math.sin(deltaD1)
+      h2 = h1 + deltaHeight - r2 * Math.sin(deltaD2)
+      w1 = Math.cos(deltaD1) * r1
+      w2 = Math.cos(deltaD2) * r2
+    }
+    
+    p1 = [x - w1, h1]
+    p2 = [x - w2, h2]
+    p3 = [x + w1, h1]
+    p4 = [x + w2, h2]
+    return [p1, p2, p3, p4, {x1: cx, y: cy, x2: cx2, r: r, d1: deltaD1, d2: deltaD2}]
+  }
+  
+  function draw () {
+    var points = getPoints(current),
+        p1 = points[0],
+        p2 = points[1],
+        p3 = points[2],
+        p4 = points[3],
+        core3 = points[4]
+    ctx.clearRect(0, 0, 300, 500)
+    ctx.fillStyle = '#000000'
+    if (current <= deltaR) {
+      ctx.beginPath()
+      ctx.arc(core1.xy[0], core1.xy[1], r1, 0, 2 * pi)
+      ctx.stroke()
+      ctx.fill()
+    } else {
+      ctx.beginPath()
+      //ctx.arc(p1[0], p1[1], 5, 0, 2*pi)
+      //ctx.arc(p2[0], p2[1], 5, 0, 2 * pi)
+      //ctx.arc(core3.x, core3.y, 5, 0, 2*pi)
+      //ctx.arc(core2.xy[0], core2.xy[1] + current, 5, 0, 2*pi)
+      ctx.stroke()
+      
+      ctx.beginPath()
+      ctx.arc(core1.xy[0], core1.xy[1], r1, 0, 2 * pi, true)
+      ctx.stroke()
+      ctx.fill()
+      
+      ctx.beginPath()
+      ctx.arc(core3.x1, core3.y, core3.r, 0 - core3.d1, core3.d2)
+      ctx.arc(core3.x2, core3.y, core3.r, pi - core3.d2, pi + core3.d1)
+      ctx.stroke()
+      ctx.fill()
+      
+      ctx.beginPath()
+      ctx.arc(core2.xy[0], core2.xy[1] + current, r2, 0, 2 * pi, true)
+      ctx.stroke()
+      ctx.fill()
+    }
+  }
+  
+  var releasedTime = 0
+  function release () {
+    if (current > 0 && !isTouched) {
+      var t = +new Date()
+      if (!releasedTime) {releasedTime = t}
+      console.log(t - releasedTime)
+      current = current - speed * (t - releasedTime)
+      releasedTime = current > 0 ? t : 0
+    }
+  }
+  
+  function requestAFrame (fn) {
+    return (window.requestAnimationFrame ||
+    window.webkitRequestAnimationFrame ||
+    window.mozRequestAnimationFrame ||
+    window.oRequestAnimationFrame ||
+    setTimeout)(fn)
+  }
+  
+  function cancelAFrame (id) {
+    return (window.cancelAnimationFrame ||
+    window.webkitCancelAnimationFrame ||
+    window.mozCancelAnimationFrame ||
+    window.oCancelAnimationFrame ||
+    clearTimeout)(id)
+  }
+  
+  var isMobile = (function () {
+    var ua = navigator.userAgent,
+        result = false
+    if (ua.match(/Android/i) || ua.match(/webOS/i) || ua.match(/iPhone/i) || ua.match(/iPad/i) || ua.match(/iPod/i) || ua.match(/BlackBerry/i) || ua.match(/Windows Phone/i)) {
+      result = true
+    }
+    return result
+  }())
+  
+  var event = {
+    start: isMobile ? 'touchstart' : 'mousedown',
+    move: isMobile ? 'touchmove' : 'mousemove',
+    end: isMobile ? 'touchend' : 'mouseup'
+  }
+  
+  var startY = 0,
+      isTouched = false
+  function bind () {
+    document.addEventListener(event.start, function (e) {
+      e.preventDefault()
+      isTouched = true
+      startY = typeof e.clientY === 'undefined' ? e.touches[0].pageY : e.clientY
+    })
+    
+    document.addEventListener(event.move, function (e) {
+      e.preventDefault()
+      if (!isTouched) {return}
+      var c = typeof e.clientY === 'undefined' ? e.touches[0].pageY : e.clientY
+      current = current + c - startY
+      current = current <= max ? current : max
+      startY = c
+    })
+    
+    document.addEventListener(event.end, function (e) {
+      e.preventDefault()
+      isTouched = false
+    })
+  }
+  
+  var ftpHandler = {
+    fps: 45,
+    lastTime: 0,
+    check: function () {
+      var time = +new Date(),
+          result = false
+      if (!this.lastTime) {
+        this.lastTime = time
+      } else {
+        if (time - this.lastTime >= 1000 / this.fps) {
+          this.lastTime = time
+          result = true
+        }
+      }
+      return result
+    }
+  }
+  
+  var helper = {
+    clear: function () {
+      this.box.innerHTML = ''
+    },
+    write: function (something) {
+      var text = ''
+      if (typeof something === 'string' || typeof something === 'number') {
+        text = something
+      } else if (typeof something === 'function') {
+        text = something.toString()
+      } else if (typeof something === 'object') {
+        text = JSON.stringify(something)
+      }
+      this.box.innerHTML = '<p>' + text + '</p>' + this.box.innerHTML
+    },
+    ini: function () {
+      var showBox = document.createElement('div')
+      showBox.className = 'help-show-box'
+      this.box = showBox
+      if (isDebug) {document.body.appendChild(showBox)}
+    }
+  }
+  
+  $(function () {
+    helper.ini()
+    bind()
+    run()
+  })
+}(true))
+</script>
+<script type="text/javascript">
+  var _bdhmProtocol = (("https:" == document.location.protocol) ? " https://" : " http://");
+  document.write(unescape("%3Cscript src='" + _bdhmProtocol + "hm.baidu.com/h.js%3Fd8f2c125d0bc7eb307617ca5a2d451d4' type='text/javascript'%3E%3C/script%3E"));
+  </script>
+</body>
+</html>
