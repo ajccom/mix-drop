@@ -25,18 +25,16 @@ canvas {width: 300px; height: 500px; margin: 0 auto; display: block;}
 ;(function (isDebug) {
   var canvas      = document.getElementById('canvas'),
       ctx         = canvas.getContext('2d'),
-      core1       = {xy: [150, 120], r: 50},
-      core2       = {xy: [150, 120], r: 30},
-      flex        = 0.8, //[0 - 1], 柔韧度，描述在两核之间表面弧度的切面角度位置
-      deltaD1     = 0,
-      deltaD2     = 0,
-      density     = 0.4, //(0 - oo), 表面圆半径的宽度，数值为超出大核半径的倍数
-      ductility   = 3, //(0, oo), 延展性，数值为两核半径之和的倍数，可求出最大拉伸距离
+      core1       = {xy: [150, 120], r: 40},
+      core2       = {xy: [150, 120], r: 20},
+      flex        = 0.2, //[0 - oo], 柔韧度，参与计算两核相切的圆的半径长度
+      density     = 0.3, //(0 - oo), 表面圆半径的宽度，数值为超出大核半径的倍数
+      ductility   = 2.5, //(0, oo), 延展性，数值为两核半径之和的倍数，可求出最大拉伸距离
       current     = 25 //拉伸的长度，单位为px
   
   //defined constant be used in function
   var max = (core1.r + core2.r) * ductility,
-      speed = max / 200,
+      speed = max / 500,
       r1 = core1.r * (1 + density),
       r2 = core2.r * (1 + density),
       deltaR = r1 - r2,
@@ -63,6 +61,7 @@ canvas {width: 300px; height: 500px; margin: 0 auto; display: block;}
         p2 = [],
         p3 = [],
         p4 = [],
+        core = {},
         x = core1.xy[0],
         h1 = core1.xy[1],
         h2 = 0,
@@ -74,26 +73,42 @@ canvas {width: 300px; height: 500px; margin: 0 auto; display: block;}
       w2 = w1
     } else {
       //求core1 core2的外切圆
-      var r = deltaHeight * (1 + flex),
+      var r = deltaHeight * flex,
           deg1 = deltaHeight,
           deg2 = r + r1,
           deg3 = r + r2,
           deltaD1 = pi / 2 - Math.acos((deg1 * deg1 + deg2 * deg2 - deg3 * deg3) / (2 * deg1 * deg2)),
           deltaD2 = pi / 2 - Math.acos((deg1 * deg1 + deg3 * deg3 - deg2 * deg2) / (2 * deg1 * deg3)),
+          deltaD3 = 0,
           cx = x - deg2 * Math.cos(deltaD1),
           cy = h1 + deg2 * Math.sin(deltaD1),
-          cx2 = x + deg2 * Math.cos(deltaD1)
+          cx2 = x + deg2 * Math.cos(deltaD1),
+          h = Math.sin(pi /2 - deltaD1) * (r1 + r)
       h1 = h1 + r1 * Math.sin(deltaD1)
       h2 = h1 + deltaHeight - r2 * Math.sin(deltaD2)
       w1 = Math.cos(deltaD1) * r1
       w2 = Math.cos(deltaD2) * r2
+      if (h < r) {
+        deltaD3 = Math.acos(h / r)
+      }
     }
     
     p1 = [x - w1, h1]
     p2 = [x - w2, h2]
     p3 = [x + w1, h1]
     p4 = [x + w2, h2]
-    return [p1, p2, p3, p4, {x1: cx, y: cy, x2: cx2, r: r, d1: deltaD1, d2: deltaD2}]
+    core = {
+      x1: cx,             //core3圆心X坐标
+      y:  cy,              //core3圆心Y坐标
+      x2: cx2,            //core3的对称圆圆心X坐标
+      r:  r,               //core3半径
+      d1: deltaD1 || 0,   //core1core3半径组成的直线与水平线夹角
+      d2: deltaD2 || 0,   //core2core3半径组成的直线与水平线夹角
+      d3: deltaD3 || 0    //超过中线的弧度角度
+    }
+    
+    
+    return [p1, p2, p3, p4, core]
   }
   
   function draw () {
@@ -104,6 +119,14 @@ canvas {width: 300px; height: 500px; margin: 0 auto; display: block;}
         p4 = points[3],
         core3 = points[4]
     ctx.clearRect(0, 0, 300, 500)
+    
+    ctx.beginPath()
+    //ctx.arc(80, 80, 20, 0, pi / 4)
+    //ctx.lineTo(0, 0)
+    //ctx.arc(80, 80, 20, 0, pi / 4, true)
+    //ctx.lineTo(0, 0)
+    //ctx.stroke()
+    
     ctx.fillStyle = '#000000'
     if (current <= deltaR) {
       ctx.beginPath()
@@ -124,8 +147,18 @@ canvas {width: 300px; height: 500px; margin: 0 auto; display: block;}
       ctx.fill()
       
       ctx.beginPath()
-      ctx.arc(core3.x1, core3.y, core3.r, 0 - core3.d1, core3.d2)
-      ctx.arc(core3.x2, core3.y, core3.r, pi - core3.d2, pi + core3.d1)
+      if (!core3.d3) {
+        ctx.arc(core3.x1, core3.y, core3.r, 0 - core3.d1, core3.d2)
+        ctx.arc(core3.x2, core3.y, core3.r, pi - core3.d2, pi + core3.d1)
+      } else {
+        ctx.arc(core3.x1, core3.y, core3.r, 0 - core3.d1, 0 - core3.d3)
+        ctx.arc(core3.x2, core3.y, core3.r, pi + core3.d3, pi + core3.d1)
+        ctx.stroke()
+        ctx.fill()
+        ctx.beginPath()
+        ctx.arc(core3.x1, core3.y, core3.r, core3.d3, core3.d2)
+        ctx.arc(core3.x2, core3.y, core3.r, pi - core3.d2, pi - core3.d3)
+      }
       ctx.stroke()
       ctx.fill()
       
