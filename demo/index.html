@@ -27,9 +27,9 @@ canvas {width: 300px; height: 500px; margin: 0 auto; display: block;}
       ctx         = canvas.getContext('2d'),
       core1       = {xy: [150, 120], r: 40},
       core2       = {xy: [150, 120], r: 20},
-      flex        = 0.2, //[0 - oo], 柔韧度，参与计算两核相切的圆的半径长度
+      flex        = 0.5, //[0 - oo], 柔韧度，参与计算两核相切的圆的半径长度
       density     = 0.3, //(0 - oo), 表面圆半径的宽度，数值为超出大核半径的倍数
-      ductility   = 2.5, //(0, oo), 延展性，数值为两核半径之和的倍数，可求出最大拉伸距离
+      ductility   = 1.8, //(0, oo), 延展性，数值为两核半径之和的倍数，可求出最大拉伸距离
       current     = 25 //拉伸的长度，单位为px
   
   //defined constant be used in function
@@ -174,7 +174,6 @@ canvas {width: 300px; height: 500px; margin: 0 auto; display: block;}
     if (current > 0 && !isTouched) {
       var t = +new Date()
       if (!releasedTime) {releasedTime = t}
-      console.log(t - releasedTime)
       current = current - speed * (t - releasedTime)
       releasedTime = current > 0 ? t : 0
     }
@@ -217,6 +216,7 @@ canvas {width: 300px; height: 500px; margin: 0 auto; display: block;}
     document.addEventListener(event.start, function (e) {
       e.preventDefault()
       isTouched = true
+      releasedTime = 0
       startY = typeof e.clientY === 'undefined' ? e.touches[0].pageY : e.clientY
     })
     
